@@ -1,32 +1,16 @@
-use std::io;
-use std::io::Error;
-use std::process::Command;
+use std::{
+    fs,
+    env,
+    path::PathBuf,
+    io::{self, Write, Error},
+    process::{Command, ExitStatus}
+};
 
-/*
-fn getPathVar() {return std::env::var("HOME");}
-
-fn getCurrentDir() {return env::current_dir();}
-
-fn parseCmd(input: &str) -> Option<String> {
-    if input.is_empty() {
-        None
-    } else {
-    // else check for first space, return substring until space
-    return String::from(input)?;
-    }
+fn getCurrentDir() -> String { // not actually an effective check?
+    let binding = env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("?"));
+    let cwd = binding;
+    return cwd.display().to_string();
 }
-
-fn parseArg(input: &str) -> Option<String> {
-    if input is empty return null
-    else check for first space, return substring after space
-}
-*/
-
-fn execCmd(input: &str) {
-    Command::new(input);
-}
-
-enum Builtins {Cd, Echo, Exit, Pwd, Type}
 
 struct Shell {
     prompt: String,
@@ -34,20 +18,58 @@ struct Shell {
     cmd: Option<String>,
     arg: Option<String>,
     path: Option<String>,
-    cwd: Option<String>,
+    cwd: String,
 }
 
 impl Shell {
     fn checkBuiltin(){}
     fn printPrompt(&self) {println!("{}", &self.prompt);}
-    fn printWorkingDir() {}
-    fn handleInput(&self) {
-        execCmd(&self.input);
-        // let cmd = parseCmd(&self.input);
-        // let arg = parseArg(&self.input);
-        // if not builtin execCmd(cmd) 
-        // else go through builtin
+    fn readLine(&mut self) {
+        io::stdin()
+            .read_line(&mut self.input)
+            .expect("input error");}
+    fn execExternal(&self) -> io::Result<ExitStatus> {
+        // unconfirmed
+        let cmd: &String = self.cmd.as_ref().unwrap();
+        let mut child = Command::new(cmd);
+        if let Some(ref args) = self.arg {
+            for a in args.split_whitespace(){child.arg(a);}
+            } child.status()
     }
+    fn execBuiltIn(&mut self) -> bool {
+        // unconfirmed
+        let cmd = match &self.cmd {
+        Some (c) => c.as_str(),
+        None => return false,
+        };
+        match cmd {
+            // "cd" => {}
+            "echo" => {if let Some(ref a) = self.arg {println!("{}", a); return true;} else {return false;}}
+            "exit" => {return true;}
+            "pwd" => {self.cwd = getCurrentDir(); print!("{}", &self.cwd); return true;}
+            // "type" => {}
+            &_ => todo!()
+        }
+    }
+    /*
+    fn parseInput(&self) {
+        let trimmed = self.input.trim_end_matches('\n').trim();
+        if trimmed.is_empty() {
+            self.cmd = None;
+            self.arg = None;
+            return;
+        }
+        if let Some((first.is_space(), rest)) {
+            self.cmd = Some(first.to_string());
+        } else {
+            self.cmd = Some(trimmed.to_string());
+            self.arg = None;
+        }
+    }
+    fn handleInput(&self) {
+        if checkBuiltin(self.cmd) == true {execBuiltIn(self.cmd);}
+    } else {execExternal(self.cmd);}
+    */
 }
 
 fn main() -> Result <(), Error> {
@@ -57,13 +79,13 @@ fn main() -> Result <(), Error> {
         cmd: None,
         arg: None,
         path: None,
-        cwd: None};
+        cwd: String::new()};
     loop {
         shell.printPrompt();
-        io::stdin()
-            .read_line(&mut shell.input)
-            .expect("input error");
-        shell.handleInput();
+        shell.readLine();
+        
+        //shell.parseInput();
+        //shell.handleInput();
     } Ok (())
 }
 
