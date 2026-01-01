@@ -3,7 +3,7 @@ use std::{
     env,
     path::PathBuf,
     io::{self, Write, Error},
-    process::{Command, ExitStatus}
+    process::{self, Command, ExitStatus}
 };
 
 fn getCurrentDir() -> String { // not actually an effective check?
@@ -22,8 +22,11 @@ struct Shell {
 }
 
 impl Shell {
-    fn checkBuiltin(){}
     fn printPrompt(&self) {println!("{}", &self.prompt);}
+    fn checkBuiltin(&self) -> bool {
+        let builtins: std::collections::HashSet<&str> = ["cd", "echo", "exit", "pwd", "type"].into();
+        return true; // do real check !!!!!!!
+    }
     fn readLine(&mut self) {
         io::stdin()
             .read_line(&mut self.input)
@@ -45,31 +48,23 @@ impl Shell {
         match cmd {
             // "cd" => {}
             "echo" => {if let Some(ref a) = self.arg {println!("{}", a); return true;} else {return false;}}
-            "exit" => {return true;}
+            "exit" => {process::exit(0); return true;}
             "pwd" => {self.cwd = getCurrentDir(); print!("{}", &self.cwd); return true;}
             // "type" => {}
             &_ => todo!()
         }
     }
-    /*
-    fn parseInput(&self) {
-        let trimmed = self.input.trim_end_matches('\n').trim();
-        if trimmed.is_empty() {
-            self.cmd = None;
-            self.arg = None;
-            return;
-        }
-        if let Some((first.is_space(), rest)) {
-            self.cmd = Some(first.to_string());
-        } else {
-            self.cmd = Some(trimmed.to_string());
-            self.arg = None;
-        }
+    fn parseInput(&mut self) {
+        let mut parts = self.input.split_whitespace();
+        let cmd = String::from(parts.next().unwrap());
+        // let args: Vec<String> = parts.map(|s| s.to_owned()).collect();
+        // Some((cmd, args))
+        self.cmd = Some(cmd);
+        // self.arg = args;
     }
-    fn handleInput(&self) {
-        if checkBuiltin(self.cmd) == true {execBuiltIn(self.cmd);}
-    } else {execExternal(self.cmd);}
-    */
+    fn handleInput(&mut self) {
+        if (Shell::checkBuiltin(self) == true) {Shell::execBuiltIn(self);} else {Shell::execExternal(self);}
+    }
 }
 
 fn main() -> Result <(), Error> {
