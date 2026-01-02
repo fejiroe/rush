@@ -97,7 +97,7 @@ impl Shell {
         }
         true
     }
-    fn exec_extern(&self) -> io::Result<ExitStatus> {
+    fn exec_extern(&self) -> io::Result<()> {
         let cmd: &String = self.cmd.as_ref().unwrap();
         let mut child = Command::new(cmd);
         if let Some(ref args) = self.arg {
@@ -105,7 +105,11 @@ impl Shell {
                 child.arg(a);
             }
         }
-        child.status()
+        let status = child.status()?;
+        if !status.success() {
+            eprintln!("{}: exit status {}", cmd, status)
+        }
+        Ok(())
     }
     fn exec_builtin(&mut self) -> bool {
         let cmd = match &self.cmd {
@@ -141,24 +145,8 @@ impl Shell {
         }
         if self.check_builtin() {
             self.exec_builtin();
-        }
-        match self.exec_extern() {
-            Ok(status) => {
-                if !status.success() {
-                    eprintln!(
-                        "{}: exit status {}",
-                        self.cmd.as_deref().unwrap_or(""),
-                        status
-                    );
-                }
-            }
-            Err(e) => {
-                eprintln!(
-                    "{}: failed to execute: {}",
-                    self.cmd.as_deref().unwrap_or(""),
-                    e
-                );
-            }
+        } else {
+            let status = self.exec_extern();
         }
     }
 }
@@ -174,10 +162,9 @@ fn main() -> Result<(), Error> {
     loop {
         shell.print_prompt();
         if shell.read_ln()? {
-            break;
+            shell.parse_in();
+            shell.handle_in();
         }
-        shell.parse_in();
-        shell.handle_in();
     }
     Ok(())
 }
