@@ -62,10 +62,10 @@ impl Shell {
         print!("{}", &self.prompt);
         io::stdout().flush().expect("fail to flush stdout");
     }
-    fn check_builtin(&self) -> bool {
+    fn check_builtin(word: &str) -> bool {
         let builtins: std::collections::HashSet<&str> =
             ["cd", "echo", "exit", "pwd", "type"].into();
-        self.cmd.as_deref().map_or(false, |c| builtins.contains(c))
+        builtins.contains(word)
     }
     fn read_ln(&mut self) -> io::Result<bool> {
         self.input.clear();
@@ -101,21 +101,24 @@ impl Shell {
         return true;
     }
     fn exec_type(&self) -> bool {
-        // not properly working
-        let cmd = match &self.cmd {
-            Some(c) => c.as_str(),
+        let target = match &self.arg {
+            Some(arg) => arg.split_whitespace().next().unwrap_or_default(),
             None => return false,
         };
-        if Shell::check_builtin(&self) == true {
-            println!("{} is a builtin", cmd);
+        if target.is_empty() {
+            println!("type: missing arg");
             return true;
         }
-        match Self::find_in_path(cmd) {
+        if Shell::check_builtin(target) == true {
+            println!("{} is a builtin", target);
+            return true;
+        }
+        match Self::find_in_path(target) {
             Some(full) => {
-                println!("{} is {}", cmd, full.display());
+                println!("{} is {}", target, full.display());
             }
             None => {
-                println!("{} is not found", cmd);
+                println!("{} is not found", target);
             }
         }
         true
@@ -167,7 +170,7 @@ impl Shell {
         if self.cmd.is_none() {
             return Ok(());
         }
-        if self.check_builtin() {
+        if Shell::check_builtin(&self.cmd.as_deref().unwrap_or("")) {
             self.exec_builtin();
             return Ok(());
         } else {
