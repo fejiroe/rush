@@ -1,36 +1,40 @@
 use std::{
     env, fs,
     io::{self, Error, Write},
+    os::unix::fs::PermissionsExt,
     process::{self, Command, ExitStatus},
 };
-
-fn get_dir() -> String {
-    // not actually an effective check?
-    let binding = env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("?"));
-    let cwd = binding;
-    return cwd.display().to_string();
-}
-
-fn find_in_path(cmd: &str) -> Option<std::path::PathBuf> {
-    let path = env::var("PATH").unwrap_or_else(|_| String::new());
-    for dir in path.split(':') {
-        let path = std::path::Path::new(dir).join(cmd);
-        if path.exists() {
-            return Some(path);
-        }
-    }
-    None
-}
 
 struct Shell {
     prompt: String,
     input: String,
     cmd: Option<String>,
     arg: Option<String>,
-    cwd: String,
+    cwd: Option<String>,
 }
 
 impl Shell {
+    fn get_dir() -> Option<String> {
+        env::current_dir()
+            .ok()
+            .and_then(|p| p.to_str().map(String::from))
+    }
+    fn is_executable(path: &std::path::Path) -> bool {
+        match fs::metadata(path) {
+            Ok(metadata) => metadata.is_file() && metadata.permissions().mode() & 0o111 != 0,
+            Err(_) => false,
+        }
+    }
+    fn find_in_path(cmd: &str) -> Option<std::path::PathBuf> {
+        let path = env::var("PATH").unwrap_or_else(|_| String::new());
+        for dir in path.split(':') {
+            let path = std::path::Path::new(dir).join(cmd);
+            if path.exists() && Self::is_executable(&path) {
+                return Some(path);
+            }
+        }
+        None
+    }
     fn print_prompt(&self) {
         print!("{}", &self.prompt);
         io::stdout().flush().expect("fail to flush stdout");
@@ -48,7 +52,7 @@ impl Shell {
         if let Some(ref path) = self.arg {
             match env::set_current_dir(path) {
                 Ok(_) => {
-                    self.cwd = get_dir();
+                    self.cwd = Self::get_dir();
                 }
                 Err(e) => {
                     eprint!("cd: {}: {}", path, e);
@@ -68,11 +72,12 @@ impl Shell {
         true
     }
     fn exec_pwd(&mut self) -> bool {
-        self.cwd = get_dir();
-        print!("{}", &self.cwd);
+        self.cwd = Self::get_dir();
+        print!("{}", &self.cwd.clone().unwrap_or_else(|| String::new()));
         return true;
     }
     fn exec_type(&self) -> bool {
+        // not properly working
         let cmd = match &self.cmd {
             Some(c) => c.as_str(),
             None => return false,
@@ -81,7 +86,7 @@ impl Shell {
             println!("{} is a builtin", cmd);
             return true;
         }
-        match find_in_path(cmd) {
+        match Self::find_in_path(cmd) {
             Some(full) => {
                 println!("{} is {}", cmd, full.display());
             }
@@ -92,7 +97,6 @@ impl Shell {
         true
     }
     fn exec_extern(&self) -> io::Result<ExitStatus> {
-        // unconfirmed
         let cmd: &String = self.cmd.as_ref().unwrap();
         let mut child = Command::new(cmd);
         if let Some(ref args) = self.arg {
@@ -103,7 +107,6 @@ impl Shell {
         child.status()
     }
     fn exec_builtin(&mut self) -> bool {
-        // unconfirmed
         let cmd = match &self.cmd {
             Some(c) => c.as_str(),
             None => return false,
@@ -146,7 +149,7 @@ fn main() -> Result<(), Error> {
         input: String::new(),
         cmd: None,
         arg: None,
-        cwd: String::new(),
+        cwd: None,
     };
     loop {
         shell.print_prompt();
@@ -168,7 +171,7 @@ mod tests {
             input: "echo hello".to_string(),
             cmd: None,
             arg: None,
-            cwd: String::new(),
+            cwd: Some(String::new()),
         };
         shell.parse_in();
         assert_eq!(shell.cmd.as_deref(), Some("echo"));
@@ -181,7 +184,7 @@ mod tests {
             input: String::new(),
             cmd: None,
             arg: None,
-            cwd: String::new(),
+            cwd: Some(String::new()),
         };
         shell.cmd = Some("echo".to_string());
         assert!(shell.check_builtin());
