@@ -54,7 +54,11 @@ impl Shell {
                 .stdout(Stdio::piped())
                 .spawn()?;
             let output = child.wait_with_output()?;
-            self.prompt = String::from_utf8_lossy(&output.stdout).to_string();
+            self.prompt = String::from_utf8_lossy(&output.stdout)
+                .to_string()
+                .chars()
+                .filter(|c| !['{', '}', '%'].contains(c))
+                .collect();
         }
         Ok(())
     }
