@@ -23,12 +23,13 @@ struct Shell {
 
 impl Shell {
     fn print_prompt(&self) {
-        println!("{}", &self.prompt);
+        print!("{}", &self.prompt);
+        io::stdout().flush().expect("fail to flush stdout");
     }
     fn check_builtin(&self) -> bool {
         let builtins: std::collections::HashSet<&str> =
             ["cd", "echo", "exit", "pwd", "type"].into();
-        return true; // do real check !!!!!!!
+        self.cmd.as_deref().map_or(false, |c| builtins.contains(c))
     }
     fn read_ln(&mut self) {
         io::stdin().read_line(&mut self.input).expect("input error");
@@ -95,7 +96,7 @@ impl Shell {
 
 fn main() -> Result<(), Error> {
     let mut shell = Shell {
-        prompt: String::from("$"),
+        prompt: String::from("$  "),
         input: String::new(),
         cmd: None,
         arg: None,
@@ -128,5 +129,19 @@ mod tests {
         shell.parse_in();
         assert_eq!(shell.cmd.as_deref(), Some("echo"));
         assert_eq!(shell.arg.as_deref(), Some("hello"));
+    }
+    fn test_check_builtin() {
+        let mut shell = Shell {
+            prompt: String::default(),
+            input: String::new(),
+            cmd: None,
+            arg: None,
+            path: None,
+            cwd: String::new(),
+        };
+        shell.cmd = Some("echo".to_string());
+        assert!(shell.check_builtin());
+        shell.cmd = Some("ls".to_string());
+        assert!(!shell.check_builtin());
     }
 }
