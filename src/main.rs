@@ -229,8 +229,8 @@ mod tests {
             exit_status: None,
         };
         shell.cmd = Some("echo".to_string());
-        assert!(shell.check_builtin());
+        assert!(Shell::check_builtin(&shell.cmd.as_deref().unwrap()));
         shell.cmd = Some("ls".to_string());
-        assert!(!shell.check_builtin());
+        assert!(!Shell::check_builtin(&shell.cmd.as_deref().unwrap()));
     }
 }
