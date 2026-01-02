@@ -135,10 +135,29 @@ impl Shell {
         self.arg = parts.next().map(|s| s.to_string());
     }
     fn handle_in(&mut self) {
-        if Shell::check_builtin(self) == true {
-            Shell::exec_builtin(self);
-        } else {
-            Shell::exec_extern(self);
+        if self.cmd.is_none() {
+            return;
+        }
+        if self.check_builtin() {
+            self.exec_builtin();
+        }
+        match self.exec_extern() {
+            Ok(status) => {
+                if !status.success() {
+                    eprintln!(
+                        "{}: exit status {}",
+                        self.cmd.as_deref().unwrap_or(""),
+                        status
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!(
+                    "{}: failed to execute: {}",
+                    self.cmd.as_deref().unwrap_or(""),
+                    e
+                );
+            }
         }
     }
 }
