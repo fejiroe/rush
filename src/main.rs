@@ -1,7 +1,6 @@
 use std::{
     env, fs,
     io::{self, Error, Write},
-    path::PathBuf,
     process::{self, Command, ExitStatus},
 };
 
@@ -17,7 +16,6 @@ struct Shell {
     input: String,
     cmd: Option<String>,
     arg: Option<String>,
-    path: Option<String>,
     cwd: String,
 }
 
@@ -32,7 +30,39 @@ impl Shell {
         self.cmd.as_deref().map_or(false, |c| builtins.contains(c))
     }
     fn read_ln(&mut self) {
+        self.input.clear();
         io::stdin().read_line(&mut self.input).expect("input error");
+    }
+    fn exec_cd(&mut self) -> bool {
+        if let Some(ref path) = self.arg {
+            match env::set_current_dir(path) {
+                Ok(_) => {
+                    self.cwd = get_dir();
+                }
+                Err(e) => {
+                    eprint!("cd: {}: {}", path, e);
+                }
+            }
+            true
+        } else {
+            true
+        }
+    }
+    fn exec_echo(&self) -> bool {
+        if let Some(ref a) = self.arg {
+            println!("{}", a);
+        } else {
+            println!();
+        }
+        true
+    }
+    fn exec_pwd(&mut self) -> bool {
+        self.cwd = get_dir();
+        print!("{}", &self.cwd);
+        return true;
+    }
+    fn exec_type(&self) -> bool {
+        return true;
     }
     fn exec_extern(&self) -> io::Result<ExitStatus> {
         // unconfirmed
@@ -52,25 +82,14 @@ impl Shell {
             None => return false,
         };
         match cmd {
-            // "cd" => {}
-            "echo" => {
-                if let Some(ref a) = self.arg {
-                    println!("{}", a);
-                    return true;
-                } else {
-                    return false;
-                }
-            }
+            "cd" => self.exec_cd(),
+            "echo" => self.exec_echo(),
             "exit" => {
                 process::exit(0);
             }
-            "pwd" => {
-                self.cwd = get_dir();
-                print!("{}", &self.cwd);
-                return true;
-            }
-            // "type" => {}
-            &_ => todo!(),
+            "pwd" => self.exec_pwd(),
+            "type" => self.exec_type(),
+            _ => false,
         }
     }
     fn parse_in(&mut self) {
@@ -100,7 +119,6 @@ fn main() -> Result<(), Error> {
         input: String::new(),
         cmd: None,
         arg: None,
-        path: None,
         cwd: String::new(),
     };
     loop {
@@ -108,7 +126,7 @@ fn main() -> Result<(), Error> {
         shell.read_ln();
 
         shell.parse_in();
-        //shell.handle_in();
+        shell.handle_in();
     }
     Ok(())
 }
@@ -123,20 +141,19 @@ mod tests {
             input: "echo hello".to_string(),
             cmd: None,
             arg: None,
-            path: None,
             cwd: String::new(),
         };
         shell.parse_in();
         assert_eq!(shell.cmd.as_deref(), Some("echo"));
         assert_eq!(shell.arg.as_deref(), Some("hello"));
     }
+    #[test]
     fn test_check_builtin() {
         let mut shell = Shell {
             prompt: String::default(),
             input: String::new(),
             cmd: None,
             arg: None,
-            path: None,
             cwd: String::new(),
         };
         shell.cmd = Some("echo".to_string());
