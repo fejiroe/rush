@@ -2,7 +2,7 @@ use std::{
     env, fs,
     io::{self, Error, Write},
     os::unix::fs::PermissionsExt,
-    process::{self, Command, ExitStatus},
+    process::{self, Command, Stdio},
 };
 
 struct Shell {
@@ -26,14 +26,36 @@ impl Shell {
         }
     }
     fn find_in_path(cmd: &str) -> Option<std::path::PathBuf> {
-        let path = env::var("PATH").unwrap_or_else(|_| String::new());
-        for dir in path.split(':') {
-            let path = std::path::Path::new(dir).join(cmd);
-            if path.exists() && Self::is_executable(&path) {
-                return Some(path);
+        if let Some(path) = env::var_os("PATH") {
+            for dir in env::split_paths(&path) {
+                let candidate = std::path::Path::new(&dir).join(cmd);
+                if candidate.exists() && Self::is_executable(&candidate) {
+                    return Some(candidate);
+                }
             }
         }
         None
+    }
+    fn has_starship() -> bool {
+        if !Self::find_in_path("starship").is_none() {
+            return true;
+        } else {
+            return false;
+        };
+    }
+    fn update_prompt(&mut self) -> io::Result<()> {
+        if !Self::has_starship() {
+            self.prompt = String::from("$ ");
+        } else {
+            let child = Command::new("starship")
+                .arg("prompt")
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .spawn()?;
+            let output = child.wait_with_output()?;
+            self.prompt = String::from_utf8_lossy(&output.stdout).to_string();
+        }
+        Ok(())
     }
     fn print_prompt(&self) {
         print!("{}", &self.prompt);
@@ -147,23 +169,26 @@ impl Shell {
             self.exec_builtin();
         } else {
             let status = self.exec_extern();
+            // need to handle this
         }
     }
 }
 
 fn main() -> Result<(), Error> {
     let mut shell = Shell {
-        prompt: String::from("$  "),
+        prompt: String::new(),
         input: String::new(),
         cmd: None,
         arg: None,
         cwd: None,
     };
+    shell.update_prompt()?;
     loop {
         shell.print_prompt();
         if shell.read_ln()? {
             shell.parse_in();
             shell.handle_in();
+            shell.update_prompt()?;
         }
     }
     Ok(())
