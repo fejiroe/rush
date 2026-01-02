@@ -11,6 +11,17 @@ fn get_dir() -> String {
     return cwd.display().to_string();
 }
 
+fn find_in_path(cmd: &str) -> Option<std::path::PathBuf> {
+    let path = env::var("PATH").unwrap_or_else(|_| String::new());
+    for dir in path.split(':') {
+        let path = std::path::Path::new(dir).join(cmd);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    None
+}
+
 struct Shell {
     prompt: String,
     input: String,
@@ -62,7 +73,23 @@ impl Shell {
         return true;
     }
     fn exec_type(&self) -> bool {
-        return true;
+        let cmd = match &self.cmd {
+            Some(c) => c.as_str(),
+            None => return false,
+        };
+        if Shell::check_builtin(&self) == true {
+            println!("{} is a builtin", cmd);
+            return true;
+        }
+        match find_in_path(cmd) {
+            Some(full) => {
+                println!("{} is {}", cmd, full.display());
+            }
+            None => {
+                println!("{} is not found", cmd);
+            }
+        }
+        true
     }
     fn exec_extern(&self) -> io::Result<ExitStatus> {
         // unconfirmed
