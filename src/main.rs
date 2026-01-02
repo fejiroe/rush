@@ -263,4 +263,9 @@ mod tests {
         shell.cmd = Some("ls".to_string());
         assert!(!Shell::check_builtin(&shell.cmd.as_deref().unwrap()));
     }
+    #[test]
+    fn test_find_in_path() {
+        let path = Shell::find_in_path("ls");
+        assert!(path.is_some(), "ls not found in PATH");
+    }
 }
