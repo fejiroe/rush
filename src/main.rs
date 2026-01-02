@@ -38,11 +38,7 @@ impl Shell {
         None
     }
     fn has_starship() -> bool {
-        if !Self::find_in_path("starship").is_none() {
-            return true;
-        } else {
-            return false;
-        };
+        Self::find_in_path("starship").is_some()
     }
     fn update_prompt(&mut self) -> io::Result<()> {
         if !Self::has_starship() {
@@ -138,7 +134,7 @@ impl Shell {
             println!("type: missing arg");
             return true;
         }
-        if Shell::check_builtin(target) == true {
+        if Shell::check_builtin(target) {
             println!("{} is a builtin", target);
             return true;
         }
@@ -228,7 +224,6 @@ fn main() -> Result<(), Error> {
             shell.update_prompt()?;
         }
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -259,9 +254,9 @@ mod tests {
             exit_status: None,
         };
         shell.cmd = Some("echo".to_string());
-        assert!(Shell::check_builtin(&shell.cmd.as_deref().unwrap()));
+        assert!(Shell::check_builtin(shell.cmd.as_deref().unwrap()));
         shell.cmd = Some("ls".to_string());
-        assert!(!Shell::check_builtin(&shell.cmd.as_deref().unwrap()));
+        assert!(!Shell::check_builtin(shell.cmd.as_deref().unwrap()));
     }
     #[test]
     fn test_find_in_path() {
