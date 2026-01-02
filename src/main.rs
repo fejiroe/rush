@@ -122,8 +122,8 @@ impl Shell {
     }
     fn exec_pwd(&mut self) -> bool {
         self.cwd = Self::get_dir();
-        print!("{}", &self.cwd.clone().unwrap_or_else(|| String::new()));
-        return true;
+        print!("{}", &self.cwd.clone().unwrap_or_default());
+       true
     }
     fn exec_type(&self) -> bool {
         let target = match &self.arg {
@@ -196,9 +196,9 @@ impl Shell {
         if self.cmd.is_none() {
             return Ok(());
         }
-        if Shell::check_builtin(&self.cmd.as_deref().unwrap_or("")) {
+        if Shell::check_builtin(self.cmd.as_deref().unwrap_or("")) {
             self.exec_builtin();
-            return Ok(());
+            Ok(())
         } else {
             self.exec_extern()?;
             Ok(())
@@ -220,7 +220,7 @@ fn main() -> Result<(), Error> {
         shell.print_prompt();
         if shell.read_ln()? {
             shell.parse_in();
-            shell.handle_in();
+            shell.handle_in(); /**/
             shell.update_prompt()?;
         }
     }
