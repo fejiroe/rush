@@ -44,9 +44,10 @@ impl Shell {
             ["cd", "echo", "exit", "pwd", "type"].into();
         self.cmd.as_deref().map_or(false, |c| builtins.contains(c))
     }
-    fn read_ln(&mut self) {
+    fn read_ln(&mut self) -> io::Result<bool> {
         self.input.clear();
-        io::stdin().read_line(&mut self.input).expect("input error");
+        let confirm = io::stdin().read_line(&mut self.input)?;
+        Ok(confirm > 0)
     }
     fn exec_cd(&mut self) -> bool {
         if let Some(ref path) = self.arg {
@@ -172,8 +173,9 @@ fn main() -> Result<(), Error> {
     };
     loop {
         shell.print_prompt();
-        shell.read_ln();
-
+        if shell.read_ln()? {
+            break;
+        }
         shell.parse_in();
         shell.handle_in();
     }
