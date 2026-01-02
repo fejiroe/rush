@@ -11,6 +11,7 @@ struct Shell {
     cmd: Option<String>,
     arg: Option<String>,
     cwd: Option<String>,
+    exit_status: Option<i32>,
 }
 
 impl Shell {
@@ -119,7 +120,7 @@ impl Shell {
         }
         true
     }
-    fn exec_extern(&self) -> io::Result<()> {
+    fn exec_extern(&mut self) -> io::Result<()> {
         let cmd: &String = self.cmd.as_ref().unwrap();
         let mut child = Command::new(cmd);
         if let Some(ref args) = self.arg {
@@ -131,6 +132,7 @@ impl Shell {
         if !status.success() {
             eprintln!("{}: exit status {}", cmd, status)
         }
+        self.exit_status = Some(status.code().unwrap_or(0));
         Ok(())
     }
     fn exec_builtin(&mut self) -> bool {
@@ -161,15 +163,16 @@ impl Shell {
         self.cmd = Some(cmd);
         self.arg = parts.next().map(|s| s.to_string());
     }
-    fn handle_in(&mut self) {
+    fn handle_in(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.cmd.is_none() {
-            return;
+            return Ok(());
         }
         if self.check_builtin() {
             self.exec_builtin();
+            return Ok(());
         } else {
-            let status = self.exec_extern();
-            // need to handle this
+            self.exec_extern()?;
+            Ok(())
         }
     }
 }
@@ -181,6 +184,7 @@ fn main() -> Result<(), Error> {
         cmd: None,
         arg: None,
         cwd: None,
+        exit_status: None,
     };
     shell.update_prompt()?;
     loop {
@@ -205,6 +209,7 @@ mod tests {
             cmd: None,
             arg: None,
             cwd: Some(String::new()),
+            exit_status: None,
         };
         shell.parse_in();
         assert_eq!(shell.cmd.as_deref(), Some("echo"));
@@ -218,6 +223,7 @@ mod tests {
             cmd: None,
             arg: None,
             cwd: Some(String::new()),
+            exit_status: None,
         };
         shell.cmd = Some("echo".to_string());
         assert!(shell.check_builtin());
