@@ -95,6 +95,31 @@ impl Shell {
         }
         true
     }
+    fn exec_kill(&mut self) -> bool {
+        let pid = match &self.arg {
+            Some(arg) => arg.split_whitespace().next(),
+            None => None,
+        };
+        let pid = match pid {
+            Some(p) => p,
+            None => {
+                eprintln!("kill: missing arg");
+                return false;
+            }
+        };
+        match Command::new("kill").arg(pid).status() {
+            Ok(status) => {
+                if !status.success() {
+                    eprintln!("kill: failed to kill process");
+                }
+                self.exit_status = Some(status.code().unwrap_or(0))
+            }
+            Err(e) => {
+                eprintln!("kill: failed to kill process: {}", e);
+            }
+        }
+        true
+    }
     fn exec_pwd(&mut self) -> bool {
         self.cwd = Self::get_dir();
         print!("{}", &self.cwd.clone().unwrap_or_else(|| String::new()));
@@ -149,6 +174,7 @@ impl Shell {
             "exit" => {
                 process::exit(0);
             }
+            "kill" => self.exec_kill(),
             "pwd" => self.exec_pwd(),
             "type" => self.exec_type(),
             _ => false,
