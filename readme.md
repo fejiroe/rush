@@ -5,6 +5,8 @@ can install with "cargo install --path ." after git cloning this repo and cd int
 might do:
 - more builtins: eval, etc
 - implement history
+- pipeline
+- (config/history) file reading
 - fix starship prompt displaying unwanted characters
 - vi modes + keybindings
 - proper testing
