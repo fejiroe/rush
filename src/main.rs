@@ -72,20 +72,13 @@ impl Shell {
         let confirm = io::stdin().read_line(&mut self.input)?;
         Ok(confirm > 0)
     }
-    fn exec_cd(&mut self) -> bool {
+    fn exec_cd(&mut self) -> Result<(), String> {
         if let Some(ref path) = self.arg {
-            match env::set_current_dir(path) {
-                Ok(_) => {
-                    self.cwd = Self::get_dir();
-                }
-                Err(e) => {
-                    eprint!("cd: {}: {}", path, e);
-                }
-            }
-            true
-        } else {
-            true
+            env::set_current_dir(path)
+                .map_err(|e| format!("cd: {}: {}", path, e))?;
+            self.cwd = Self::get_dir();
         }
+        Ok(())
     }
     fn exec_echo(&self) -> bool {
         if let Some(ref a) = self.arg {
@@ -163,13 +156,13 @@ impl Shell {
         self.exit_status = Some(status.code().unwrap_or(0));
         Ok(())
     }
-    fn exec_builtin(&mut self) -> bool {
+    fn exec_builtin(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let cmd = match &self.cmd {
             Some(c) => c.as_str(),
             None => return false,
         };
         match cmd {
-            "cd" => self.exec_cd(),
+            "cd" => Ok(self.exec_cd())?,
             "echo" => self.exec_echo(),
             "exit" => {
                 process::exit(0);
