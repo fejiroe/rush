@@ -1,10 +1,13 @@
 use std::{
     env, fs,
-    io::{self, Error, Write},
+    io::{self, ErrorKind, Write},
     os::unix::fs::PermissionsExt,
     process::{self, Command, Stdio},
 };
 
+fn err(msg: impl Into<String>) -> io::Error {
+    io::Error::new(ErrorKind::Other, msg.into())
+}
 struct Shell {
     prompt: String,
     input: String,
@@ -72,14 +75,14 @@ impl Shell {
         let confirm = io::stdin().read_line(&mut self.input)?;
         Ok(confirm > 0)
     }
-    fn exec_cd(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn exec_cd(&mut self) -> Result<(), std::io::Error> {
         if let Some(ref path) = self.arg {
-            env::set_current_dir(path).map_err(|e| format!("cd: {}: {}", path, e))?;
+            env::set_current_dir(path).map_err(|e| err(format!("cd: {}: {}", path, e)))?;
             self.cwd = Self::get_dir();
         }
         Ok(())
     }
-    fn exec_echo(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn exec_echo(&self) -> Result<(), std::io::Error> {
         if let Some(ref a) = self.arg {
             println!("{}", a);
         } else {
@@ -87,7 +90,7 @@ impl Shell {
         }
         Ok(())
     }
-    fn exec_kill(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn exec_kill(&mut self) -> Result<(), std::io::Error> {
         let pid = match &self.arg {
             Some(arg) => arg.split_whitespace().next(),
             None => None,
@@ -95,7 +98,7 @@ impl Shell {
         let pid = match pid {
             Some(p) => p,
             None => {
-                return Err("kill: missing argument".into());
+                return Err(err("kill: missing argument"));
             }
         };
         match Command::new("kill").arg(pid).status() {
@@ -111,15 +114,15 @@ impl Shell {
         }
         Ok(())
     }
-    fn exec_pwd(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn exec_pwd(&mut self) -> Result<(), std::io::Error> {
         self.cwd = Self::get_dir();
         print!("{}", &self.cwd.clone().unwrap_or_default());
         Ok(())
     }
-    fn exec_type(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn exec_type(&self) -> Result<(), std::io::Error> {
         let target = match &self.arg {
             Some(arg) => arg.split_whitespace().next().unwrap_or_default(),
-            None => return Err("type: missing argument".into()),
+            None => return Err(err("type: missing argument")),
         };
         if target.is_empty() {
             println!("type: missing arg");
@@ -139,7 +142,7 @@ impl Shell {
         }
         Ok(())
     }
-    fn exec_extern(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn exec_extern(&mut self) -> Result<(), std::io::Error> {
         let cmd: &String = self.cmd.as_ref().unwrap();
         let mut child = Command::new(cmd);
         if let Some(ref args) = self.arg {
@@ -154,7 +157,7 @@ impl Shell {
         self.exit_status = Some(status.code().unwrap_or(0));
         Ok(())
     }
-    fn exec_builtin(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn exec_builtin(&mut self) -> Result<(), std::io::Error> {
         let cmd = match &self.cmd {
             Some(c) => c.as_str(),
             None => return Ok(()),
@@ -183,7 +186,7 @@ impl Shell {
         self.cmd = Some(cmd);
         self.arg = parts.next().map(|s| s.to_string());
     }
-    fn handle_in(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn handle_in(&mut self) -> Result<(), std::io::Error> {
         if self.cmd.is_none() {
             return Ok(());
         }
@@ -197,7 +200,7 @@ impl Shell {
     }
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), std::io::Error> {
     let mut shell = Shell {
         prompt: String::new(),
         input: String::new(),
@@ -211,7 +214,7 @@ fn main() -> Result<(), Error> {
         shell.print_prompt();
         if shell.read_ln()? {
             shell.parse_in();
-            shell.handle_in(); /**/
+            shell.handle_in()?; /**/
             shell.update_prompt()?;
         }
     }
