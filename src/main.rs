@@ -72,23 +72,22 @@ impl Shell {
         let confirm = io::stdin().read_line(&mut self.input)?;
         Ok(confirm > 0)
     }
-    fn exec_cd(&mut self) -> Result<(), String> {
+    fn exec_cd(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ref path) = self.arg {
-            env::set_current_dir(path)
-                .map_err(|e| format!("cd: {}: {}", path, e))?;
+            env::set_current_dir(path).map_err(|e| format!("cd: {}: {}", path, e))?;
             self.cwd = Self::get_dir();
         }
         Ok(())
     }
-    fn exec_echo(&self) -> bool {
+    fn exec_echo(&self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ref a) = self.arg {
             println!("{}", a);
         } else {
             println!();
         }
-        true
+        Ok(())
     }
-    fn exec_kill(&mut self) -> bool {
+    fn exec_kill(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let pid = match &self.arg {
             Some(arg) => arg.split_whitespace().next(),
             None => None,
@@ -96,8 +95,7 @@ impl Shell {
         let pid = match pid {
             Some(p) => p,
             None => {
-                eprintln!("kill: missing arg");
-                return false;
+                return Err("kill: missing argument".into());
             }
         };
         match Command::new("kill").arg(pid).status() {
@@ -111,25 +109,25 @@ impl Shell {
                 eprintln!("kill: failed to kill process: {}", e);
             }
         }
-        true
+        Ok(())
     }
-    fn exec_pwd(&mut self) -> bool {
+    fn exec_pwd(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.cwd = Self::get_dir();
         print!("{}", &self.cwd.clone().unwrap_or_default());
-       true
+        Ok(())
     }
-    fn exec_type(&self) -> bool {
+    fn exec_type(&self) -> Result<(), Box<dyn std::error::Error>> {
         let target = match &self.arg {
             Some(arg) => arg.split_whitespace().next().unwrap_or_default(),
-            None => return false,
+            None => return Err("type: missing argument".into()),
         };
         if target.is_empty() {
             println!("type: missing arg");
-            return true;
+            return Ok(());
         }
         if Shell::check_builtin(target) {
             println!("{} is a builtin", target);
-            return true;
+            return Ok(());
         }
         match Self::find_in_path(target) {
             Some(full) => {
@@ -139,9 +137,9 @@ impl Shell {
                 println!("{} is not found", target);
             }
         }
-        true
+        Ok(())
     }
-    fn exec_extern(&mut self) -> io::Result<()> {
+    fn exec_extern(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let cmd: &String = self.cmd.as_ref().unwrap();
         let mut child = Command::new(cmd);
         if let Some(ref args) = self.arg {
@@ -159,10 +157,10 @@ impl Shell {
     fn exec_builtin(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let cmd = match &self.cmd {
             Some(c) => c.as_str(),
-            None => return false,
+            None => return Ok(()),
         };
         match cmd {
-            "cd" => Ok(self.exec_cd())?,
+            "cd" => self.exec_cd(),
             "echo" => self.exec_echo(),
             "exit" => {
                 process::exit(0);
@@ -170,7 +168,7 @@ impl Shell {
             "kill" => self.exec_kill(),
             "pwd" => self.exec_pwd(),
             "type" => self.exec_type(),
-            _ => false,
+            _ => return Ok(()),
         }
     }
     fn parse_in(&mut self) {
@@ -190,7 +188,7 @@ impl Shell {
             return Ok(());
         }
         if Shell::check_builtin(self.cmd.as_deref().unwrap_or("")) {
-            self.exec_builtin();
+            self.exec_builtin()?;
             Ok(())
         } else {
             self.exec_extern()?;
